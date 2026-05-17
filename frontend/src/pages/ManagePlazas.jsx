@@ -1,22 +1,14 @@
 import { useState, useEffect } from 'react';
 import { MapPin, Plus, Trash2 } from 'lucide-react';
+import { loadPlazasFromAPI } from '../services/api';
 
 export default function ManagePlazas() {
   const [plazas, setPlazas] = useState([]);
   const [newPlazaName, setNewPlazaName] = useState('');
-
-  const loadPlazasFromAPI = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/locations/');
-      const data = await response.json();
-      setPlazas(data);
-    } catch (error) {
-      console.error('Error al cargar las plazas:', error);
-    }
-  };
+  const locationEndpoint = 'locations';
 
   useEffect(() => {
-    loadPlazasFromAPI();
+    loadPlazasFromAPI(locationEndpoint, setPlazas);
   }, []);
 
 
@@ -42,7 +34,7 @@ export default function ManagePlazas() {
 
       if (response.ok) {
         setNewPlazaName('');
-        await loadPlazasFromAPI();
+        await loadPlazasFromAPI(locationEndpoint, setPlazas);
         alert('Plaza agregada correctamente');
       } else {
         const errorData = await response.json();
@@ -63,7 +55,7 @@ export default function ManagePlazas() {
         });
 
         if (response.ok) {
-          await loadPlazasFromAPI();
+          await loadPlazasFromAPI(locationEndpoint, setPlazas);
           alert('Plaza eliminada correctamente');
         } else {
           const errorData = await response.json();
