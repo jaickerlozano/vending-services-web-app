@@ -1,24 +1,56 @@
-# Logs
-logs
+# --- Python / Django ---
+# Entornos virtuales
+venv/
+.venv/
+env/
+ENV/
+bin/
+include/
+lib/
+lib64/
+
+# Archivos de caché y compilados
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Configuración de Django y DB local
+db.sqlite3
+*.sqlite3
+.env
+local_settings.py
+media/
+staticfiles/
+static_root/
 *.log
+
+# --- Node / React ---
+# Dependencias
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Build de producción (si no lo subes)
+build/
+dist/
+dist-ssr/
+
+# Frontend - Entornos y tests
 *.local
+.eslintcache
+coverage/
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# --- IDEs / Sistemas Operativos ---
+# VS Code
+.vscode/
+# PyCharm / IntelliJ
+.idea/
+# macOS
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Windows
+Thumbs.db
