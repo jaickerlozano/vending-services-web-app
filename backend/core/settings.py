@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+# pyrefly: ignore [missing-import]
 import environ
 
 # Inicializar environ
