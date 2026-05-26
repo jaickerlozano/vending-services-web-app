@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { Monitor, Plus, Trash2, Settings, Save, Coffee, Cookie } from 'lucide-react';
+import { loadDataFromAPI } from '../services/api';
+import { ENDPOINTS } from '../utils/endpoints';
 
 export default function ManageMachines() {
   const [machines, setMachines] = useState([]);
@@ -8,38 +10,85 @@ export default function ManageMachines() {
   const [products, setProducts] = useState([]);
   
   // New Machine Form
-  const [newMachine, setNewMachine] = useState({ name: '', plazaId: '', type: 'coffee' });
+  const [newMachine, setNewMachine] = useState({
+    name: '',
+    plazaId: '',
+    type: 'coffee'
+  });
   
   // Edit Mode
   const [editingMachine, setEditingMachine] = useState(null);
 
   useEffect(() => {
-    refreshData();
+    loadDataFromAPI(ENDPOINTS.locations, setPlazas);
+    loadDataFromAPI(ENDPOINTS.machines, setMachines);
+    // loadDataFromAPI ENDPOINTS.products, setProducts);
   }, []);
+  console.log(machines)
 
-  const refreshData = () => {
-    setMachines(db.getMachines());
-    setPlazas(db.getPlazas());
-    setProducts(db.getProducts());
-  };
+  // const handleAdd = (e) => {
+  //   e.preventDefault();
+  //   if (!machines.name || !machines.locations) return;
 
-  const handleAdd = (e) => {
+  //   db.addMachine({
+  //     ...newMachine,
+  //     plazaId: parseInt(newMachine.plazaId),
+  //     products: [] // Start empty or default? Let's start empty.
+  //   });
+  //   setNewMachine({ name: '', plazaId: '', type: 'coffee' });
+  //   refreshData();
+  // };
+
+    const handleAdd = async (e) => {
     e.preventDefault();
-    if (!newMachine.name || !newMachine.plazaId) return;
 
-    db.addMachine({
-      ...newMachine,
-      plazaId: parseInt(newMachine.plazaId),
-      products: [] // Start empty or default? Let's start empty.
-    });
-    setNewMachine({ name: '', plazaId: '', type: 'coffee' });
-    refreshData();
+    if (!newMachine.name.trim()) {
+      alert('Por favor ingresa un nombre para la máquina');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:8000/api/machines/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: newMachine.name,
+          location: newMachine.plazaId,
+          type: newMachine.type,
+        })
+      });
+
+      if (response.ok) {
+        setNewMachine({ name: '', location: '', type: 'coffee' });
+        await loadDataFromAPI(ENDPOINTS.machines, setMachines);
+        alert('Máquina agregada correctamente');
+      } else {
+        const errorData = await response.json();        const [newMachine, setNewMachine] = useState({
+          name: '',
+          plazaId: '',
+          type: 'coffee'
+        });
+        console.error('Error al agregar la máquina:', errorData);
+        alert('Error al agregar la máquina: ' + JSON.stringify(errorData));
+      }
+    } catch (error) {
+      console.error('Error de conexión:', error);
+      alert('Error de conexión con el servidor');
+    }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm('¿Eliminar equipo? Se perderá el historial asociado si no está respaldado.')) {
-      db.deleteMachine(id);
-      refreshData();
+      try {
+        await fetch(`http://localhost:8000/api/machines/${id}/`, {
+          method: 'DELETE'
+        });
+        await loadDataFromAPI(ENDPOINTS.machines, setMachines);
+      } catch (error) {
+        console.error('Error al eliminar:', error);
+      }
     }
   };
 
@@ -108,8 +157,8 @@ export default function ManageMachines() {
                   <input 
                     type="radio" 
                     name="type" 
-                    checked={newMachine.type === 'coffee'} 
-                    onChange={() => setNewMachine({...newMachine, type: 'coffee'})}
+                    checked={newMachine.type === 'coffee' || newMachine.type === 'snacks'} 
+                    onChange={() => setNewMachine({...newMachine, type: newMachine.type === 'coffee' ? 'snack' : 'coffee'})}
                   />
                   <span>Café</span>
                 </label>

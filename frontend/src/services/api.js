@@ -1,8 +1,8 @@
-export const loadPlazasFromAPI = async (endpoint, setPlazas) => {
+export const loadDataFromAPI = async (endpoint, setData) => {
     try {
       const response = await fetch(`http://localhost:8000/api/${endpoint}/`);
       const data = await response.json();
-      setPlazas(data);
+      setData(data);
     } catch (error) {
       console.error('Error al cargar las plazas:', error);
     }
