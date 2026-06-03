@@ -1,90 +1,97 @@
 import { useState, useEffect } from 'react';
 import { MapPin, Plus, Trash2 } from 'lucide-react';
-import { loadDataFromAPI } from '../services/api';
+import { loadDataFromAPI, postDataToAPI, deleteDataFromAPI } from '../services/api';
+import { ENDPOINTS } from '../utils/endpoints';
 
 export default function ManagePlazas() {
   const [plazas, setPlazas] = useState([]);
   const [newPlazaName, setNewPlazaName] = useState('');
-  const locationEndpoint = 'locations';
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
-    loadDataFromAPI(locationEndpoint, setPlazas);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await loadDataFromAPI(ENDPOINTS.locations, setPlazas);
+      } catch (error) {
+        showMessage('error', 'Error al cargar plazas');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
+  const showMessage = (type, text) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!newPlazaName.trim()) {
-      alert('Por favor ingresa un nombre para la plaza');
+      showMessage('error', 'Por favor ingresa un nombre para la plaza');
       return;
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/locations/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: newPlazaName,
-          address: ''
-        })
-      });
-
-      if (response.ok) {
+      await postDataToAPI(ENDPOINTS.locations, {
+        name: newPlazaName,
+        address: ''
+      }, () => {
         setNewPlazaName('');
-        await loadDataFromAPI(locationEndpoint, setPlazas);
-        alert('Plaza agregada correctamente');
-      } else {
-        const errorData = await response.json();
-        console.error('Error al agregar la plaza:', errorData);
-        alert('Error al agregar la plaza: ' + JSON.stringify(errorData));
-      }
+        loadDataFromAPI(ENDPOINTS.locations, setPlazas);
+        showMessage('success', 'Plaza agregada correctamente');
+      });
     } catch (error) {
       console.error('Error de conexión:', error);
-      alert('Error de conexión con el servidor');
+      showMessage('error', 'Error de conexión con el servidor');
     }
   };
 
   const handleDelete = async (id) => {
     if (confirm('¿Estás seguro de eliminar esta plaza?')) {
       try {
-        const response = await fetch(`http://localhost:8000/api/locations/${id}/`, {
-          method: 'DELETE'
-        });
-
-        if (response.ok) {
-          await loadDataFromAPI(locationEndpoint, setPlazas);
-          alert('Plaza eliminada correctamente');
-        } else {
-          const errorData = await response.json();
-          alert('No se pudo eliminar: ' + JSON.stringify(errorData));
-        }
+        await deleteDataFromAPI(ENDPOINTS.locations, id);
+        await loadDataFromAPI(ENDPOINTS.locations, setPlazas);
+        showMessage('success', 'Plaza eliminada correctamente');
       } catch (error) {
         console.error('Error al eliminar:', error);
-        alert('Error de conexión al eliminar la plaza');
+        showMessage('error', 'Error de conexión al eliminar la plaza');
       }
     }
   };
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '1.875rem', color: 'var(--color-primary)' }}>Gestionar Plazas</h1>
+    <div className="max-w-[800px] mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl text-primary">Gestionar Plazas</h1>
         <p className="text-muted">Añadir o eliminar ubicaciones para tus equipos</p>
       </div>
+
+      {message.text && (
+        <div className={`p-3 rounded-lg mb-4 ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+          {message.text}
+        </div>
+      )}
+
+      {loading && (
+        <div className="p-4 mb-4 text-center text-muted">
+          Cargando plazas...
+        </div>
+      )}
 
       <div className="card">
         <form 
           onSubmit={handleSubmit} 
-          style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}
-          >
-          <div style={{ position: 'relative', flex: 1 }}>
-            <MapPin size={18} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--color-text-muted)' }} />
+          className="flex gap-4 mb-8"
+        >
+          <div className="relative flex-1">
+            <MapPin size={18} className="absolute left-3 top-3 text-muted" />
             <input 
-              className="input" 
-              style={{ paddingLeft: '2.5rem' }}
+              className="input pl-10" 
               placeholder="Nombre de la nueva plaza"
               value={newPlazaName}
               onChange={(e) => setNewPlazaName(e.target.value)}
@@ -95,28 +102,19 @@ export default function ManagePlazas() {
           </button>
         </form>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="flex flex-col gap-4">
           {plazas.map(plaza => (
-            <div key={plaza.id} style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              padding: '1rem', 
-              backgroundColor: 'var(--color-bg)', 
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--color-border)'
-            }}>
-              <span style={{ fontWeight: 500 }}>{plaza.name}</span>
+            <div key={plaza.id} className="flex justify-between items-center p-4 rounded-md border border-border bg-bg">
+              <span className="font-medium">{plaza.name}</span>
               <button 
-                className="btn btn-ghost" 
-                style={{ color: 'var(--color-error)' }}
+                className="btn btn-ghost text-error" 
                 onClick={() => handleDelete(plaza.id)}
               >
                 <Trash2 size={18} />
               </button>
             </div>
           ))}
-          {plazas.length === 0 && <div className="text-muted" style={{ textAlign: 'center' }}>No hay plazas registradas</div>}
+          {plazas.length === 0 && <div className="text-muted text-center">No hay plazas registradas</div>}
         </div>
       </div>
     </div>

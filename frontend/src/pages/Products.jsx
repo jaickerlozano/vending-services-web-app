@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Edit2, Save, X, Plus, Trash2, Package, Coffee, Cookie } from 'lucide-react';
-import { loadDataFromAPI } from '../services/api';
+import { loadDataFromAPI, postDataToAPI, deleteDataFromAPI, updateDataFromAPI, loadOptionsFromAPI } from '../services/api';
 import { ENDPOINTS } from '../utils/endpoints';
 
 export default function Products() {
@@ -18,35 +18,36 @@ export default function Products() {
     price: '', 
   });
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
   const [productTypes, setProductTypes] = useState([]);
   const [typeMachines, setTypeMachines] = useState([]);
 
   useEffect(() => {
-    loadDataFromAPI(ENDPOINTS.products, setProducts);
-    // Cargar opciones desde el backend
-    loadOptions();
-  }, []);
-
-  const loadOptions = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/products/options/');
-      if (response.ok) {
-        const data = await response.json();
-        setProductTypes(data.types);
-        setTypeMachines(data.machines);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          loadDataFromAPI(ENDPOINTS.products, setProducts),
+          loadOptionsFromAPI((data) => {
+            setProductTypes(data.types);
+            setTypeMachines(data.machines);
+          }),
+        ]);
+      } catch (error) {
+        showMessage('error', 'Error al cargar datos');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error cargando opciones:', error);
-    }
-  };
-
+    };
+    fetchData();
+  }, []);
 
   const handleAdd = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     if (!newProduct.name.trim()) {
-      alert('Por favor ingresa un nombre para el producto');
+      showMessage('error', 'Por favor ingresa un nombre para el producto');
       setLoading(false);
       return;
     }
@@ -67,24 +68,15 @@ export default function Products() {
         payload.type = 'cafe';
       }
       
-      const response = await fetch(`http://localhost:8000/api/${ENDPOINTS.products}/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (response.ok) {
+      await postDataToAPI(ENDPOINTS.products, payload, () => {
         setNewProduct({ name: '', type: '', type_machine: typeMachine, supplier: '', cost: '', price: '' });
         setShowAddForm(false);
-        await loadDataFromAPI(ENDPOINTS.products, setProducts);
-        alert('Producto agregado correctamente');
-      } else {
-        const errorData = await response.json();
-        alert('Error: ' + JSON.stringify(errorData));
-      }
+        loadDataFromAPI(ENDPOINTS.products, setProducts);
+        showMessage('success', 'Producto agregado correctamente');
+      });
     } catch (error) {
       console.error('Error:', error);
-      alert('Error de conexión');
+      showMessage('error', 'Error de conexión');
     } finally {
       setLoading(false);
     }
@@ -95,20 +87,12 @@ export default function Products() {
     if (confirm('¿Estás seguro de eliminar este producto?')) {
       setLoading(true);
       try {
-        const response = await fetch(`http://localhost:8000/api/${ENDPOINTS.products}/${id}/`, {
-          method: 'DELETE'
-        });
-
-        if (response.ok) {
-          await loadDataFromAPI(ENDPOINTS.products, setProducts);
-          alert('Producto eliminado correctamente');
-        } else {
-          const errorData = await response.json();
-          alert('Error: ' + JSON.stringify(errorData));
-        }
+        await deleteDataFromAPI(ENDPOINTS.products, id);
+        await loadDataFromAPI(ENDPOINTS.products, setProducts);
+        showMessage('success', 'Producto eliminado correctamente');
       } catch (error) {
         console.error('Error:', error);
-        alert('Error de conexión');
+        showMessage('error', 'Error de conexión');
       } finally {
         setLoading(false);
       }
@@ -129,7 +113,7 @@ export default function Products() {
     setLoading(true);
     
     if (!editForm.name.trim()) {
-      alert('El nombre del producto es requerido');
+      showMessage('error', 'El nombre del producto es requerido');
       setLoading(false);
       return;
     }
@@ -144,24 +128,14 @@ export default function Products() {
         price: parseFloat(editForm.price) || 0,
       };
 
-      const response = await fetch(`http://localhost:8000/api/${ENDPOINTS.products}/${editingId}/`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (response.ok) {
-        setEditingId(null);
-        setEditForm({});
-        await loadDataFromAPI(ENDPOINTS.products, setProducts);
-        alert('Producto actualizado correctamente');
-      } else {
-        const errorData = await response.json();
-        alert('Error: ' + JSON.stringify(errorData));
-      }
+      await updateDataFromAPI(ENDPOINTS.products, editingId, payload);
+      setEditingId(null);
+      setEditForm({});
+      await loadDataFromAPI(ENDPOINTS.products, setProducts);
+      showMessage('success', 'Producto actualizado correctamente');
     } catch (error) {
       console.error('Error:', error);
-      alert('Error de conexión');
+      showMessage('error', 'Error de conexión');
     } finally {
       setLoading(false);
     }
@@ -170,10 +144,10 @@ export default function Products() {
   const filteredProducts = products.filter(p => p.type_machine === typeMachine);
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+    <div className="max-w-[1000px] mx-auto">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 style={{ fontSize: '1.875rem', color: 'var(--color-primary)' }}>Productos</h1>
+          <h1 className="text-3xl text-primary">Productos</h1>
           <p className="text-muted">Gestión por tipo de máquina</p>
         </div>
         <button 
@@ -186,34 +160,30 @@ export default function Products() {
         </button>
       </div>
 
+      {message.text && (
+        <div className={`p-3 rounded-lg mb-4 ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+          {message.text}
+        </div>
+      )}
+
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--color-border)' }}>
+      <div className="flex gap-4 mb-8 border-b border-border">
         <button
           onClick={() => setTypeMachine('coffee')}
+          className="flex items-center gap-2 p-4 bg-transparent border-none border-b-2 font-semibold cursor-pointer"
           style={{
-            display: 'flex', alignItems: 'center', gap: '0.5rem',
-            padding: '1rem',
-            background: 'transparent',
-            border: 'none',
-            borderBottom: typeMachine === 'coffee' ? '2px solid var(--color-accent)' : '2px solid transparent',
+            borderBottomColor: typeMachine === 'coffee' ? 'var(--color-accent)' : 'transparent',
             color: typeMachine === 'coffee' ? 'var(--color-accent)' : 'var(--color-text-muted)',
-            fontWeight: 600,
-            cursor: 'pointer'
           }}
         >
           <Coffee size={20} /> Máquinas de Café
         </button>
         <button
           onClick={() => setTypeMachine('snack')}
+          className="flex items-center gap-2 p-4 bg-transparent border-none border-b-2 font-semibold cursor-pointer"
           style={{
-            display: 'flex', alignItems: 'center', gap: '0.5rem',
-            padding: '1rem',
-            background: 'transparent',
-            border: 'none',
-            borderBottom: typeMachine === 'snack' ? '2px solid var(--color-accent)' : '2px solid transparent',
+            borderBottomColor: typeMachine === 'snack' ? 'var(--color-accent)' : 'transparent',
             color: typeMachine === 'snack' ? 'var(--color-accent)' : 'var(--color-text-muted)',
-            fontWeight: 600,
-            cursor: 'pointer'
           }}
         >
           <Cookie size={20} /> Máquinas de Snacks
@@ -221,11 +191,13 @@ export default function Products() {
       </div>
 
       {showAddForm && (
-        <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--color-accent)' }}>
-          <h3 style={{ marginBottom: '1rem' }}>Agregar a: {typeMachine === 'coffee' ? 'Café' : 'Snacks'}</h3>
-          <form onSubmit={handleAdd} style={{ display: 'grid', gridTemplateColumns: typeMachine === 'snack' ? 'minmax(200px, 1.5fr) 1fr 1fr 1fr 1fr auto' : 'minmax(200px, 1.5fr) 1fr 1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+        <div className="card mb-8 border border-accent">
+          <h3 className="mb-4">Agregar a: {typeMachine === 'coffee' ? 'Café' : 'Snacks'}</h3>
+          <form onSubmit={handleAdd} className="grid gap-4 items-end"
+            style={{ gridTemplateColumns: typeMachine === 'snack' ? 'minmax(200px, 1.5fr) 1fr 1fr 1fr 1fr auto' : 'minmax(200px, 1.5fr) 1fr 1fr 1fr auto' }}
+          >
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.25rem', display: 'block' }}>Nombre</label>
+              <label className="text-xs font-semibold mb-1 block">Nombre</label>
               <input 
                 className="input" 
                 placeholder="Nombre del producto"
@@ -237,7 +209,7 @@ export default function Products() {
             
             {typeMachine === 'snack' && (
               <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.25rem', display: 'block' }}>Tipo</label>
+                <label className="text-xs font-semibold mb-1 block">Tipo</label>
                 <select
                   className="input"
                   value={newProduct.type}
@@ -250,7 +222,7 @@ export default function Products() {
             )}
 
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.25rem', display: 'block' }}>Proveedor</label>
+              <label className="text-xs font-semibold mb-1 block">Proveedor</label>
               <input 
                 className="input" 
                 placeholder="Ej. Nestlé"
@@ -259,7 +231,7 @@ export default function Products() {
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.25rem', display: 'block' }}>Costo ($)</label>
+              <label className="text-xs font-semibold mb-1 block">Costo ($)</label>
               <input 
                 type="number" step="0.1" 
                 className="input" 
@@ -270,7 +242,7 @@ export default function Products() {
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.25rem', display: 'block' }}>Venta ($)</label>
+              <label className="text-xs font-semibold mb-1 block">Venta ($)</label>
               <input 
                 type="number" step="0.1" 
                 className="input" 
@@ -280,41 +252,40 @@ export default function Products() {
                 required
               />
             </div>
-            <button type="submit" className="btn btn-primary" style={{ height: '42px' }} disabled={loading}>
+            <button type="submit" className="btn btn-primary h-[42px]" disabled={loading}>
               {loading ? 'Guardando...' : 'Guardar'}
             </button>
           </form>
         </div>
       )}
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}>
+      <div className="card p-0 overflow-hidden">
+        <table className="w-full border-collapse text-left">
+          <thead className="bg-primary text-white">
             <tr>
-              <th style={{ padding: '1rem' }}>Producto</th>
-              {typeMachine === 'snack' && <th style={{ padding: '1rem' }}>Tipo</th>}
-              <th style={{ padding: '1rem' }}>Proveedor</th>
-              <th style={{ padding: '1rem', textAlign: 'right' }}>Costo</th>
-              <th style={{ padding: '1rem', textAlign: 'right' }}>Venta</th>
-              <th style={{ padding: '1rem', textAlign: 'right' }}>Margen</th>
-              <th style={{ padding: '1rem', textAlign: 'center' }}>Acciones</th>
+              <th className="p-4">Producto</th>
+              {typeMachine === 'snack' && <th className="p-4">Tipo</th>}
+              <th className="p-4">Proveedor</th>
+              <th className="p-4 text-right">Costo</th>
+              <th className="p-4 text-right">Venta</th>
+              <th className="p-4 text-right">Margen</th>
+              <th className="p-4 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filteredProducts.length === 0 ? (
-              <tr><td colSpan={typeMachine === 'snack' ? 7 : 6} style={{ padding: '2rem', textAlign: 'center' }}>No hay productos en esta categoría</td></tr>
+              <tr><td colSpan={typeMachine === 'snack' ? 7 : 6} className="p-8 text-center">No hay productos en esta categoría</td></tr>
             ) : filteredProducts.map(product => {
               const isEditing = editingId === product.id;
 
               return (
-                <tr key={product.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                <tr key={product.id} className="border-b border-border">
                   {/* Name */}
-                  <td style={{ padding: '1rem', fontWeight: 500 }}>
+                  <td className="p-4 font-medium">
                     {isEditing ? (
                       <div>
                         <input 
-                          className="input" 
-                          style={{ marginBottom: '0.25rem' }}
+                          className="input mb-1"
                           value={editForm.name || ''}
                           onChange={(e) => setEditForm({...editForm, name: e.target.value})}
                         />
@@ -322,7 +293,7 @@ export default function Products() {
                              Keeping category switch allows moving from coffee to snack. 
                              If moving to snack, type might correspond. If moving to coffee, type is ignored. */}
                         <select 
-                          style={{ fontSize: '0.75rem', padding: '0.25rem' }}
+                          className="text-xs p-1"
                           value={editForm.type_machine || ''}
                           onChange={(e) => setEditForm({...editForm, type_machine: e.target.value})}
                         >
@@ -331,7 +302,7 @@ export default function Products() {
                         </select>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div className="flex items-center gap-2">
                         <Package size={16} className="text-muted" />
                         {product.name}
                       </div>
@@ -340,7 +311,7 @@ export default function Products() {
                   
                   {/* Type - Only for Snacks */}
                   {typeMachine === 'snack' && (
-                    <td style={{ padding: '1rem' }}>
+                    <td className="p-4">
                       {isEditing ? (
                         <select 
                           className="input" 
@@ -359,7 +330,7 @@ export default function Products() {
                   )}
 
                   {/* Provider */}
-                  <td style={{ padding: '1rem' }}>
+                  <td className="p-4">
                     {isEditing ? (
                       <input 
                         className="input" 
@@ -372,12 +343,11 @@ export default function Products() {
                   </td>
                   
                   {/* Cost */}
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
+                  <td className="p-4 text-right">
                     {isEditing ? (
                       <input 
                         type="number" step="0.1" 
-                        className="input" 
-                        style={{ width: '80px', padding: '0.25rem', textAlign: 'right' }}
+                        className="input w-20 p-1 text-right"
                         value={editForm.cost || ''}
                         onChange={(e) => setEditForm({...editForm, cost: e.target.value})}
                       />
@@ -387,49 +357,48 @@ export default function Products() {
                   </td>
                   
                   {/* Price */}
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
+                  <td className="p-4 text-right">
                     {isEditing ? (
                       <input 
                         type="number" step="0.1" 
-                        className="input" 
-                        style={{ width: '80px', padding: '0.25rem', textAlign: 'right' }}
+                        className="input w-20 p-1 text-right"
                         value={editForm.price || ''}
                         onChange={(e) => setEditForm({...editForm, price: e.target.value})}
                       />
                     ) : (
-                      <span style={{ fontWeight: 600 }}>${product.price}</span>
+                      <span className="font-semibold">${product.price}</span>
                     )}
                   </td>
                   
                   {/* Margin */}
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    <div style={{ color: product.margin > 0 ? 'var(--color-success)' : 'var(--color-text-muted)', fontWeight: 600 }}>
+                  <td className="p-4 text-right">
+                    <div className="font-semibold" style={{ color: product.margin > 0 ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
                       ${product.margin?.toFixed(2) || '0.00'}
                     </div>
                     {product.price > 0 && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                      <div className="text-xs text-muted">
                         {product.margin_percentage?.toFixed(2) || '0.00'}%
                       </div>
                     )}
                   </td>
                   
                   {/* Actions */}
-                  <td style={{ padding: '1rem', textAlign: 'center' }}>
+                  <td className="p-4 text-center">
                     {isEditing ? (
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
-                        <button className="btn btn-primary" style={{ padding: '0.25rem' }} onClick={saveEdit} disabled={loading}>
+                      <div className="flex justify-center gap-2">
+                        <button className="btn btn-primary p-1" onClick={saveEdit} disabled={loading}>
                           <Save size={16} />
                         </button>
-                        <button className="btn btn-ghost" style={{ padding: '0.25rem' }} onClick={cancelEdit} disabled={loading}>
+                        <button className="btn btn-ghost p-1" onClick={cancelEdit} disabled={loading}>
                           <X size={16} />
                         </button>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
-                        <button className="btn btn-ghost" style={{ padding: '0.25rem' }} onClick={() => startEdit(product)} disabled={loading}>
+                      <div className="flex justify-center gap-2">
+                        <button className="btn btn-ghost p-1" onClick={() => startEdit(product)} disabled={loading}>
                           <Edit2 size={16} />
                         </button>
-                        <button className="btn btn-ghost" style={{ padding: '0.25rem', color: 'var(--color-error)' }} onClick={() => handleDelete(product.id)} disabled={loading}>
+                        <button className="btn btn-ghost p-1 text-error" onClick={() => handleDelete(product.id)} disabled={loading}>
                           <Trash2 size={16} />
                         </button>
                       </div>
