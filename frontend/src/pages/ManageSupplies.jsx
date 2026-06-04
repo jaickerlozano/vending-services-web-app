@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { Plus, Trash2, Edit2, Save, X, Coffee } from 'lucide-react';
+import { loadDataFromAPI } from '../services/api';
+import { ENDPOINTS } from '../utils/endpoints';
 
 export default function ManageSupplies() {
   const [supplies, setSupplies] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [newSupplyName, setNewSupplyName] = useState('');
   const [newSupplyUnit, setNewSupplyUnit] = useState('unid');
   const [newSupplyCost, setNewSupplyCost] = useState('');
@@ -14,11 +17,14 @@ export default function ManageSupplies() {
   const [editCost, setEditCost] = useState('');
 
   useEffect(() => {
-    refreshData();
+    setLoading(true);
+    loadDataFromAPI(ENDPOINTS.supplies, setSupplies);
+    setLoading(false);
   }, []);
 
   const refreshData = () => {
-    setSupplies(db.getSupplies());
+    setLoading(true);
+    loadDataFromAPI(ENDPOINTS.supplies, setSupplies);
   };
 
   const handleAdd = (e) => {

@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'locations',
     'machines',
     'products',
+    'supplies',
 ]
 
 MIDDLEWARE = [
